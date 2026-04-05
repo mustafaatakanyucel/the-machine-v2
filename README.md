@@ -1,6 +1,7 @@
 # The Machine v2.0
 
 The Machine v2.0 is a Chicago crime-risk intelligence dashboard built with Python and Streamlit. It combines predictive modeling, tactical mapping, precinct logistics, explainable AI, and a cyber-inspired interface into a single operational view.
+<img width="1803" height="830" alt="image" src="https://github.com/user-attachments/assets/a0db0af0-59f8-492a-8206-442b2f89e0e1" />
 
 ## What the app does
 
