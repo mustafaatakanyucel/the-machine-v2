@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+joblib
+folium
+streamlit-folium
+holidays
+pytz
+plotly
+requests
+scikit-learn
