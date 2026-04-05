@@ -48,10 +48,27 @@ MODEL_FEATURE_COLUMNS = [
 
 PRECINCTS = [
     {'name': '1st District - Central', 'Latitude': 41.8853, 'Longitude': -87.6270},
+    {'name': '2nd District - Wentworth', 'Latitude': 41.8029, 'Longitude': -87.6298},
+    {'name': '3rd District - Grand Crossing', 'Latitude': 41.7624, 'Longitude': -87.6167},
+    {'name': '4th District - South Chicago', 'Latitude': 41.7516, 'Longitude': -87.5546},
+    {'name': '5th District - Calumet', 'Latitude': 41.6926, 'Longitude': -87.6101},
     {'name': '6th District - Gresham', 'Latitude': 41.7559, 'Longitude': -87.6217},
     {'name': '7th District - Englewood', 'Latitude': 41.7772, 'Longitude': -87.6411},
     {'name': '8th District - Chicago Lawn', 'Latitude': 41.7740, 'Longitude': -87.7237},
+    {'name': '9th District - Deering', 'Latitude': 41.8136, 'Longitude': -87.6921},
+    {'name': '10th District - Ogden', 'Latitude': 41.8619, 'Longitude': -87.6822},
+    {'name': '11th District - Harrison', 'Latitude': 41.8747, 'Longitude': -87.7067},
+    {'name': '12th District - Near West', 'Latitude': 41.8754, 'Longitude': -87.7100},
+    {'name': '13th District - Chicago Avenue', 'Latitude': 41.8990, 'Longitude': -87.7020},
+    {'name': '14th District - Shakespeare', 'Latitude': 41.9550, 'Longitude': -87.7080},
+    {'name': '15th District - Austin', 'Latitude': 41.8820, 'Longitude': -87.7660},
+    {'name': '16th District - Jefferson Park', 'Latitude': 41.9780, 'Longitude': -87.7680},
+    {'name': '17th District - Albany Park', 'Latitude': 41.9670, 'Longitude': -87.7160},
+    {'name': '18th District - Near North', 'Latitude': 41.8993, 'Longitude': -87.6328},
     {'name': '19th District - Town Hall', 'Latitude': 41.9946, 'Longitude': -87.6908},
+    {'name': '20th District - Lincoln', 'Latitude': 41.9740, 'Longitude': -87.6900},
+    {'name': '21st District - Wilson', 'Latitude': 41.9786, 'Longitude': -87.6665},
+    {'name': '22nd District - Morgan Park', 'Latitude': 41.6880, 'Longitude': -87.6810},
 ]
 
 st.set_page_config(
@@ -159,21 +176,24 @@ def fahrenheit_to_celsius(value):
     return (value - 32.0) * 5.0 / 9.0
 
 
-def manhattan_distance_miles(lat1, lon1, lat2, lon2):
-    lat_miles = abs(lat1 - lat2) * 69.0
-    lon_miles = abs(lon1 - lon2) * 52.0
-    return lat_miles + lon_miles
+def haversine_distance_miles(lat1, lon1, lat2, lon2):
+    earth_radius_miles = 3958.8
+    lat1_rad, lon1_rad, lat2_rad, lon2_rad = map(np.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2_rad - lat1_rad
+    dlon = lon2_rad - lon1_rad
+    a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2.0) ** 2
+    return float(2.0 * earth_radius_miles * np.arcsin(np.sqrt(a)))
 
 
 def find_nearest_precinct(lat, lon):
     nearest_precinct = None
     nearest_distance = None
     for precinct in PRECINCTS:
-        distance_miles = manhattan_distance_miles(lat, lon, precinct['Latitude'], precinct['Longitude'])
+        distance_miles = haversine_distance_miles(lat, lon, precinct['Latitude'], precinct['Longitude'])
         if nearest_distance is None or distance_miles < nearest_distance:
             nearest_precinct = precinct
             nearest_distance = distance_miles
-    estimated_minutes = round(4.0 + (nearest_distance / 25.0) * 60.0, 1)
+    estimated_minutes = round(max(4.0, 5.0 + nearest_distance * 2.4), 1)
     return nearest_precinct, nearest_distance, estimated_minutes
 
 
@@ -190,7 +210,7 @@ def attach_precinct_metrics(df):
 
     df = df.copy()
     df['Nearest_Precinct'] = precinct_names
-    df['Manhattan_Distance_Miles'] = precinct_distances
+    df['Geo_Distance_Miles'] = precinct_distances
     df['Estimated_Response_Minutes'] = response_minutes
     return df
 
@@ -297,12 +317,28 @@ prediction_date = st.sidebar.date_input('Select a Date', chicago_time.date())
 prediction_hour = st.sidebar.slider('Select an Hour (24-hour format)', 0, 23, chicago_time.hour)
 
 st.sidebar.subheader('Stochastic Controls')
-temp_unit = st.sidebar.radio('Temperature Unit', ['Fahrenheit (°F)', 'Celsius (°C)'], index=0)
-if temp_unit == 'Fahrenheit (°F)':
-    temp_slider = st.sidebar.slider('Temperature (°F)', 14, 104, 50)
+temperature_input_c = None
+precipitation_input_mm = None
+temperature_display_value = None
+temperature_display_unit = None
+
+if temperature_input_c is None or precipitation_input_mm is None:
+    temp_unit = st.sidebar.radio('Temperature Unit', ['Fahrenheit (°F)', 'Celsius (°C)'], index=0)
+    if temp_unit == 'Fahrenheit (°F)':
+        temp_slider = st.sidebar.slider('Temperature (°F)', 14, 104, 50)
+        temperature_input_c = fahrenheit_to_celsius(temp_slider)
+    else:
+        temp_slider = st.sidebar.slider('Temperature (°C)', -10, 40, 10)
+        temperature_input_c = temp_slider
+    precipitation_input_mm = st.sidebar.slider('Precipitation (mm)', 0.0, 50.0, 0.0, 0.1)
+    temperature_display_value = temp_slider
+    temperature_display_unit = temp_unit
 else:
-    temp_slider = st.sidebar.slider('Temperature (°C)', -10, 40, 10)
-precip_slider = st.sidebar.slider('Precipitation (mm)', 0.0, 50.0, 0.0, 0.1)
+    temp_unit = 'Celsius (°C)'
+    temp_slider = temperature_input_c
+    temperature_display_value = temperature_input_c
+    temperature_display_unit = 'Celsius (°C)'
+
 lag_weight_slider = st.sidebar.slider('Spatial Lag Weight', 0.5, 2.0, 1.0, 0.1)
 crime_type = st.sidebar.selectbox('Crime Type', ['All', 'Theft', 'Assault', 'Battery', 'Robbery', 'Other'])
 is_payday = st.sidebar.toggle('Is Payday?', value=False)
@@ -318,17 +354,17 @@ if model is None or scaler is None or centroids is None:
     st.stop()
 
 
-def run_analysis(pred_date, pred_hour, temp_unit_value, temp_value, precip_value, lag_weight_value, crime_type_value, payday_flag, selected_zone_value):
+def run_analysis(pred_date, pred_hour, temperature_c_value, precipitation_mm_value, lag_weight_value, crime_type_value, payday_flag, selected_zone_value, temperature_display_value_value, temperature_display_unit_value):
     selected_hour = int(pred_hour)
     selected_zone_int = int(selected_zone_value)
-    temp_celsius = temp_value if temp_unit_value == 'Celsius (°C)' else fahrenheit_to_celsius(temp_value)
+    temp_celsius = temperature_c_value
 
     future_df = build_feature_frame(
         centroids,
         pred_date,
         selected_hour,
         temp_celsius,
-        precip_value,
+        precipitation_mm_value,
         lag_weight_value,
         pred_date in us_holidays,
     )
@@ -360,7 +396,7 @@ def run_analysis(pred_date, pred_hour, temp_unit_value, temp_value, precip_value
             pred_date,
             hour,
             temp_celsius,
-            precip_value,
+            precipitation_mm_value,
             lag_weight_value,
             pred_date in us_holidays,
         )
@@ -387,8 +423,8 @@ def run_analysis(pred_date, pred_hour, temp_unit_value, temp_value, precip_value
         'future_df': future_df,
         'trend_df': trend_df,
         'selected_zone_int': selected_zone_int,
-        'temp_slider': temp_value,
-        'temp_unit': temp_unit_value,
+        'temp_slider': temperature_display_value_value,
+        'temp_unit': temperature_display_unit_value,
         'temp_celsius': temp_celsius,
         'crime_type': crime_type_value,
         'is_payday': payday_flag,
@@ -407,13 +443,14 @@ if predict_button:
             st.session_state.dashboard_result = run_analysis(
                 prediction_date,
                 prediction_hour,
-                temp_unit,
-                temp_slider,
-                precip_slider,
+                temperature_input_c,
+                precipitation_input_mm,
                 lag_weight_slider,
                 crime_type,
                 is_payday,
                 selected_zone,
+                temperature_display_value,
+                temperature_display_unit,
             )
             st.session_state.last_analysis_error = None
             st.rerun()
@@ -453,10 +490,14 @@ with live_tab:
     metric_col1.metric('Current Highest Risk %', f'{highest_risk:.2%}')
     metric_col2.metric('Top Target Zone', f'Zone {top_target_zone}')
 
+    weather_col1, weather_col2 = st.columns(2)
+    weather_col1.metric('Temp Used', f'{temp_slider:.1f} {"°F" if temp_unit == "Fahrenheit (°F)" else "°C"}')
+    weather_col2.metric('Rain/Precip', f'{precipitation_input_mm:.1f} mm')
+
     st.caption(
         f'Crime Type Filter: {crime_type} | Payday Heuristic: {"On" if is_payday else "Off"} | '
-        f'Temperature Input: {temp_slider} {"°F" if temp_unit == "Fahrenheit (°F)" else "°C"} '
-        f'({temp_celsius:.1f}°C used by the model)'
+        f'Temperature used by model: {temp_celsius:.1f}°C | '
+        f'UI temperature selection: {temp_slider:.1f} {"°F" if temp_unit == "Fahrenheit (°F)" else "°C"}'
     )
 
     map_col, info_col = st.columns([2, 1])
@@ -531,7 +572,7 @@ with live_tab:
             clicked_lon = clicked_point.get('lng') or clicked_point.get('lon') or clicked_point.get('longitude')
             if clicked_lat is not None and clicked_lon is not None:
                 nearest_zone_idx = future_df.apply(
-                    lambda row: manhattan_distance_miles(clicked_lat, clicked_lon, row['Latitude'], row['Longitude']),
+                    lambda row: haversine_distance_miles(clicked_lat, clicked_lon, row['Latitude'], row['Longitude']),
                     axis=1,
                 ).idxmin()
                 clicked_zone_row = future_df.loc[nearest_zone_idx]
